@@ -5,6 +5,8 @@ from typing import Any
 class BaseSystem(ABC):
     """Abstract base for all CL agent systems."""
 
+    parallel_safe: bool = False  # subclass sets True when update() has no side-effects
+
     @abstractmethod
     def act(self, observation: dict) -> Any:
         """Produce an action / response given the current observation."""

@@ -32,7 +32,6 @@ _REGIMES = [
 class Episode:
     task_id: int
     regime: str
-    history: list[tuple[int, float]]
     target: float
     text: str
 
@@ -85,7 +84,6 @@ class SalesPredictionTask:
                 episodes.append(Episode(
                     task_id=task_id,
                     regime=label,
-                    history=history,
                     target=target,
                     text=_format_prompt(history),
                 ))

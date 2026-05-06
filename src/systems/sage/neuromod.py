@@ -1,7 +1,7 @@
 # Neuromodulatory signals: DA (surprise/reward), NE (novelty/arousal),
 # ACh (uncertainty/attention), 5-HT (stability/patience).
 # Implementation TBD.
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

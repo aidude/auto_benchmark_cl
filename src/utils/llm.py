@@ -5,20 +5,40 @@ from src.utils.logger import get_logger, log_llm_call
 
 load_dotenv()
 
-litellm.drop_params = True  # ignore params unsupported by a provider
+litellm.drop_params = True  # silently ignore params unsupported by a provider
 
 _log = get_logger(__name__)
 
+_PROVIDER_MAP = {
+    "openrouter/": "openrouter",
+    "claude":      "anthropic",
+    "anthropic":   "anthropic",
+}
+_ENDPOINT_MAP = {
+    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+    "anthropic":  "https://api.anthropic.com/v1/messages",
+    "openai":     "https://api.openai.com/v1/chat/completions",
+}
 
-def _call(model: str, messages: list[dict], **kwargs) -> tuple[str, dict]:
-    """Core call — logs every request to the LLM audit file."""
+
+def _provider(model: str) -> str:
+    for prefix, name in _PROVIDER_MAP.items():
+        if model.startswith(prefix) or prefix in model:
+            return name
+    return "openai"
+
+
+def complete(model: str, messages: list[dict], **kwargs) -> str:
+    """Call any model via LiteLLM. Returns assistant text."""
     _log.debug("→ %s  messages=%d", model, len(messages))
     t0 = time.monotonic()
 
     response = litellm.completion(model=model, messages=messages, **kwargs)
 
     latency_ms = (time.monotonic() - t0) * 1000
-    text = response.choices[0].message.content
+    msg = response.choices[0].message
+    # Reasoning models (R1, o1) may return content=None; fall back to reasoning_content.
+    text = msg.content or getattr(msg, "reasoning_content", None) or ""
     usage = dict(response.usage) if response.usage else {}
 
     try:
@@ -26,8 +46,11 @@ def _call(model: str, messages: list[dict], **kwargs) -> tuple[str, dict]:
     except Exception:
         cost = None
 
+    provider = _provider(model)
     log_llm_call(
         model=model,
+        provider=provider,
+        endpoint=_ENDPOINT_MAP.get(provider, "unknown"),
         messages=messages,
         response_text=text,
         usage=usage,
@@ -35,18 +58,7 @@ def _call(model: str, messages: list[dict], **kwargs) -> tuple[str, dict]:
         cost_usd=cost,
     )
     _log.debug(
-        "← %s  tokens=%s  latency=%.0fms  cost=$%.5f",
+        "← %s  tokens=%s  %.0fms  $%.5f",
         model, usage.get("total_tokens", "?"), latency_ms, cost or 0,
     )
-    return text, usage
-
-
-def complete(model: str, messages: list[dict], **kwargs) -> str:
-    """Call any model via LiteLLM. Returns assistant text."""
-    text, _ = _call(model, messages, **kwargs)
     return text
-
-
-def complete_with_usage(model: str, messages: list[dict], **kwargs) -> tuple[str, dict]:
-    """Returns (text, usage_dict) for token tracking."""
-    return _call(model, messages, **kwargs)

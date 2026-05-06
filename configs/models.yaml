@@ -1,15 +1,211 @@
-models:
-  # OpenAI
-  gpt-4o: "gpt-4o"
-  gpt-4o-mini: "gpt-4o-mini"
+# ============================================================
+# Model Registry — auto_benchmark_cl
+# ============================================================
+# Usage: pass the short name (any key under non_reasoning /
+#        reasoning) to --model. The code resolves it to the
+#        litellm string, endpoint, and any required params.
+#
+# Fields per model:
+#   litellm   : string passed to litellm.completion(model=...)
+#   endpoint  : actual API URL (for logging / audit only)
+#   context_window : max input tokens
+#   requires_key   : env var that must be set (optional)
+#   params    : extra kwargs forwarded to litellm.completion()
+#               e.g. max_tokens for reasoning models
+# ============================================================
 
-  # OpenRouter — DeepSeek
-  deepseek-chat: "openrouter/deepseek/deepseek-chat"
-  deepseek-r1: "openrouter/deepseek/deepseek-r1"
+openai:
+  non_reasoning:
+    gpt-4o:
+      litellm: "gpt-4o"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 128000
 
-  # Anthropic — requires ANTHROPIC_API_KEY (not active)
-  # claude-sonnet-4-6: "claude-sonnet-4-6-20250514"
+    gpt-4o-mini:
+      litellm: "gpt-4o-mini"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 128000
 
+    gpt-4-turbo:
+      litellm: "gpt-4-turbo"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 128000
+
+  reasoning:
+    o1:
+      litellm: "o1"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 200000
+      params:
+        max_tokens: 4000
+
+    o1-mini:
+      litellm: "o1-mini"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 128000
+      params:
+        max_tokens: 4000
+
+    o3-mini:
+      litellm: "o3-mini"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 200000
+      params:
+        max_tokens: 4000
+
+    o3:
+      litellm: "o3"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 200000
+      params:
+        max_tokens: 4000
+    
+    gpt-5.4:
+      litellm: "gpt-5.4-2026-03-05"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 1000000
+      params:
+        max_tokens: 4000
+
+    gpt-5.4-mini:
+      litellm: "gpt-5.4-mini-2026-03-17"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 400000
+      params:
+        max_tokens: 4000
+
+    gpt-5.5:
+      litellm: "gpt-5.5-2026-04-23"
+      endpoint: "https://api.openai.com/v1/chat/completions"
+      context_window: 1000000
+      params:
+        max_tokens: 4000
+    
+
+# ─────────────────────────────────────────────────────────────
+anthropic:
+  # Requires ANTHROPIC_API_KEY — set in .env before using.
+  non_reasoning:
+    claude-opus-4-7:
+      litellm: "claude-opus-4-7"
+      endpoint: "https://api.anthropic.com/v1/messages"
+      context_window: 200000
+      requires_key: ANTHROPIC_API_KEY
+
+    claude-sonnet-4-6:
+      litellm: "claude-sonnet-4-6"
+      endpoint: "https://api.anthropic.com/v1/messages"
+      context_window: 200000
+      requires_key: ANTHROPIC_API_KEY
+
+    claude-haiku-4-5:
+      litellm: "claude-haiku-4-5-20251001"
+      endpoint: "https://api.anthropic.com/v1/messages"
+      context_window: 200000
+      requires_key: ANTHROPIC_API_KEY
+
+  reasoning:
+    # Extended thinking — budget_tokens is passed as the
+    # `thinking` dict by llm.py when it detects the key.
+    claude-opus-4-7-think:
+      litellm: "claude-opus-4-7"
+      endpoint: "https://api.anthropic.com/v1/messages"
+      context_window: 200000
+      requires_key: ANTHROPIC_API_KEY
+      params:
+        max_tokens: 4000
+        budget_tokens: 4000   # converted to thinking={} in llm.py
+
+    claude-sonnet-4-6-think:
+      litellm: "claude-sonnet-4-6"
+      endpoint: "https://api.anthropic.com/v1/messages"
+      context_window: 200000
+      requires_key: ANTHROPIC_API_KEY
+      params:
+        max_tokens: 4000
+        budget_tokens: 4000
+
+# ─────────────────────────────────────────────────────────────
+openrouter:
+  non_reasoning:
+    deepseek-chat:
+      litellm: "openrouter/deepseek/deepseek-chat"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 64000
+
+    deepseek-v3:
+      litellm: "openrouter/deepseek/deepseek-chat-v3-0324"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 128000
+
+    mistral-large:
+      litellm: "openrouter/mistralai/mistral-large-2411"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 128000
+
+    llama-3.3-70b:
+      litellm: "openrouter/meta-llama/llama-3.3-70b-instruct"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 128000
+
+    qwen-2.5-72b:
+      litellm: "openrouter/qwen/qwen-2.5-72b-instruct"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 128000
+
+    gemini-2.0-flash:
+      litellm: "openrouter/google/gemini-2.0-flash-001"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 1048576
+
+    gemini-flash-1.5:
+      litellm: "openrouter/google/gemini-flash-1.5"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 1000000
+
+    phi-4:
+      litellm: "openrouter/microsoft/phi-4"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 16000
+
+  reasoning:
+    deepseek-r1:
+      litellm: "openrouter/deepseek/deepseek-r1"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 64000
+      params:
+        max_tokens: 4000
+
+    deepseek-v4-Pro:
+      litellm: "openrouter/deepseek/deepseek-v4-pro"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 1000000
+      params:
+        max_tokens: 4000
+
+    qwq-32b:
+      litellm: "openrouter/qwen/qwq-32b"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 32000
+      params:
+        max_tokens: 4000
+
+    deepseek-r1-distill-llama:
+      litellm: "openrouter/deepseek/deepseek-r1-distill-llama-70b"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 64000
+      params:
+        max_tokens: 4000
+
+    deepseek-r1-distill-qwen:
+      litellm: "openrouter/deepseek/deepseek-r1-distill-qwen-32b"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 32000
+      params:
+        max_tokens: 4000
+
+# ─────────────────────────────────────────────────────────────
+# Default horse-race shortlist (used by run_horse_race.sh)
 horse_race:
   - gpt-4o-mini
   - deepseek-chat

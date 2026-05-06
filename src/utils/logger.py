@@ -2,7 +2,7 @@
 Logging for auto_benchmark_cl.
 
 Two outputs per run (keyed by RUN_ID = HHMMSS at import time):
-  logs/YYYY-MM-DD/run_<RUN_ID>.log        — human-readable, all levels
+  logs/YYYY-MM-DD/run_<RUN_ID>.log         — human-readable, all levels
   logs/YYYY-MM-DD/llm_calls_<RUN_ID>.jsonl — one JSON line per LLM API call
 
 Usage:
@@ -12,16 +12,13 @@ Usage:
 """
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
-# Resolved once at import; all modules in a process share the same RUN_ID.
 _NOW = datetime.now()
 RUN_ID: str = _NOW.strftime("%H%M%S")
-_DATE: str = _NOW.strftime("%Y-%m-%d")
+_DATE: str  = _NOW.strftime("%Y-%m-%d")
 
-# Anchor paths to project root (two levels up from src/utils/)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _LOG_DIR: Path = _PROJECT_ROOT / "logs" / _DATE
 _LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -59,26 +56,11 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-def _provider(model: str) -> str:
-    if model.startswith("openrouter/"):
-        return "openrouter"
-    if model.startswith("claude") or "anthropic" in model:
-        return "anthropic"
-    return "openai"
-
-
-def _endpoint(model: str) -> str:
-    p = _provider(model)
-    return {
-        "openrouter":  "https://openrouter.ai/api/v1/chat/completions",
-        "anthropic":   "https://api.anthropic.com/v1/messages",
-        "openai":      "https://api.openai.com/v1/chat/completions",
-    }.get(p, "unknown")
-
-
 def log_llm_call(
     *,
     model: str,
+    provider: str,
+    endpoint: str,
     messages: list[dict],
     response_text: str,
     usage: dict,
@@ -90,8 +72,8 @@ def log_llm_call(
         "ts":                datetime.now().isoformat(timespec="milliseconds"),
         "run_id":            RUN_ID,
         "model":             model,
-        "provider":          _provider(model),
-        "endpoint":          _endpoint(model),
+        "provider":          provider,
+        "endpoint":          endpoint,
         "prompt_tokens":     usage.get("prompt_tokens"),
         "completion_tokens": usage.get("completion_tokens"),
         "total_tokens":      usage.get("total_tokens"),

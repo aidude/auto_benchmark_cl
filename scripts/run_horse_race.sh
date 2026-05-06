@@ -6,12 +6,20 @@ set -euo pipefail
 source .env 2>/dev/null || { echo "ERROR: .env not found — copy .env.example first"; exit 1; }
 
 TASKS=("sales_prediction")
-MODELS=("gpt-4o-mini" "deepseek-chat" "deepseek-r1")
+
+# Read horse_race model list from configs/models.yaml — single source of truth
+mapfile -t MODELS < <(python -c "
+import yaml
+models = yaml.safe_load(open('configs/models.yaml')).get('horse_race', [])
+print('\n'.join(models))
+")
+
 DATE=$(date +%Y-%m-%d)
 RUN_ID=$(date +%H%M%S)
 OUTDIR="results/${DATE}/horse_race_${RUN_ID}"
 mkdir -p "$OUTDIR"
 
+echo "Models: ${MODELS[*]}"
 for task in "${TASKS[@]}"; do
   for model in "${MODELS[@]}"; do
     echo "=== ${task} / ${model} ==="
@@ -23,5 +31,5 @@ for task in "${TASKS[@]}"; do
   done
 done
 
-echo "Done. Results in ${OUTDIR}"
-echo "Logs  in  logs/${DATE}/"
+echo "Done.  Results → ${OUTDIR}"
+echo "Logs  → logs/${DATE}/"
