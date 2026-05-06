@@ -1,11 +1,75 @@
-tasks:
-  - codebase_adaptation
-  - sales_prediction
+# ============================================================
+# Experiment schedules for src/experiments/batch_run.py
+#
+# Each experiment = tasks × models × systems (Cartesian product)
+# Run:  python -m src.experiments.batch_run --experiment <name>
+#       python -m src.experiments.batch_run --all
+#       python -m src.experiments.batch_run --list
+#       python -m src.experiments.batch_run --experiment <name> --dry-run
+#
+# Fields:
+#   description  : human label shown in summary
+#   tasks        : task short names  (must exist in src/experiments/run.py TASKS)
+#   models       : model short names (must exist in configs/models.yaml)
+#   systems      : stateless | icl   (sage when ready)
+#   parallel     : run combos concurrently (default: true)
+#   max_workers  : concurrent combos — each combo already fires 10 episode
+#                  threads internally, so keep this at 2-4 to avoid rate limits
+# NOTE: completed combos are auto-skipped on re-run (resume is implicit).
+# ============================================================
 
-systems:
-  - stateless
-  - icl
-  # - sage  # enable once implementation is ready
+experiments:
 
-runs_per_combo: 3
-seed: 42
+  horse_race_v1:
+    description: "Phase 1 — non-reasoning model baseline"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o-mini
+      - gpt-4o
+      - gpt-5.4
+      - deepseek-chat
+      - deepseek-v3
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 3
+
+  icl_vs_stateless:
+    description: "Stateless vs ICL on the same fast models"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o-mini
+      - deepseek-chat
+    systems:
+      - stateless
+      - icl
+    parallel: true
+    max_workers: 4
+
+  reasoning_probe:
+    description: "Reasoning models with token cap — run serially (slow)"
+    tasks:
+      - sales_prediction
+    models:
+      - deepseek-r1
+      - o1-mini
+    systems:
+      - stateless
+    parallel: false
+    max_workers: 1
+
+  nightly:
+    description: "Nightly sweep — fast non-reasoning models, both systems"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o-mini
+      - deepseek-v3
+      - deepseek-chat
+    systems:
+      - stateless
+      - icl
+    parallel: true
+    max_workers: 3
