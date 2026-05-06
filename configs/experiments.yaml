@@ -20,6 +20,17 @@
 
 experiments:
 
+  test_one:
+    description: "Single combo smoke test — verify batch runner end-to-end"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o-mini
+    systems:
+      - stateless
+    parallel: false
+    max_workers: 1
+
   horse_race_v1:
     description: "Phase 1 — non-reasoning model baseline"
     tasks:
