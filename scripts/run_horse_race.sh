@@ -5,20 +5,23 @@ set -euo pipefail
 
 source .env 2>/dev/null || { echo "ERROR: .env not found — copy .env.example first"; exit 1; }
 
-TASKS=("codebase_adaptation" "sales_prediction")
+TASKS=("sales_prediction")
 MODELS=("gpt-4o-mini" "deepseek-chat" "deepseek-r1")
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-OUTDIR="results/horse_race_${TIMESTAMP}"
+DATE=$(date +%Y-%m-%d)
+RUN_ID=$(date +%H%M%S)
+OUTDIR="results/${DATE}/horse_race_${RUN_ID}"
 mkdir -p "$OUTDIR"
 
 for task in "${TASKS[@]}"; do
   for model in "${MODELS[@]}"; do
     echo "=== ${task} / ${model} ==="
     python -m src.experiments.run \
-      --task  "$task" \
-      --model "$model" \
-      --output "${OUTDIR}/${task}_${model}.json"
+      --task   "$task" \
+      --model  "$model" \
+      --system stateless \
+      --output "${OUTDIR}/${task}_${model}_stateless.json"
   done
 done
 
 echo "Done. Results in ${OUTDIR}"
+echo "Logs  in  logs/${DATE}/"

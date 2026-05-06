@@ -16,9 +16,11 @@ htmlcov/
 .env
 *.env.local
 
-# Results (large outputs — don't commit)
+# Results and logs (large outputs — don't commit)
 results/*
 !results/.gitkeep
+logs/*
+!logs/.gitkeep
 
 # Jupyter
 .ipynb_checkpoints/
