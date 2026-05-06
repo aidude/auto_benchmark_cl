@@ -1,0 +1,11 @@
+tasks:
+  - codebase_adaptation
+  - sales_prediction
+
+systems:
+  - stateless
+  - icl
+  # - sage  # enable once implementation is ready
+
+runs_per_combo: 3
+seed: 42

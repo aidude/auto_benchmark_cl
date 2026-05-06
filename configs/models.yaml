@@ -1,0 +1,16 @@
+models:
+  # OpenAI
+  gpt-4o: "gpt-4o"
+  gpt-4o-mini: "gpt-4o-mini"
+
+  # OpenRouter — DeepSeek
+  deepseek-chat: "openrouter/deepseek/deepseek-chat"
+  deepseek-r1: "openrouter/deepseek/deepseek-r1"
+
+  # Anthropic — requires ANTHROPIC_API_KEY (not active)
+  # claude-sonnet-4-6: "claude-sonnet-4-6-20250514"
+
+horse_race:
+  - gpt-4o-mini
+  - deepseek-chat
+  - deepseek-r1
