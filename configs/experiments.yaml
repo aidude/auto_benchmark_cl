@@ -32,6 +32,18 @@ experiments:
     parallel: false
     max_workers: 1
 
+  gpt4o_vs_o3:
+    description: "gpt-4o (non-reasoning) vs o3 (reasoning) — stateless horse race"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o
+      - o3
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 2
+
   dsv3_vs_mercury2:
     description: "deepseek-v3 (non-reasoning) vs Inception-Mercury2 (reasoning) — stateless horse race"
     tasks:
