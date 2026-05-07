@@ -217,6 +217,12 @@ def run(system_name: str, info: ModelInfo, task_name: str,
             task_bar.set_postfix(regime=regime, mean=f"{mean:.3f}")
             task_bar.update(1)
 
+            # Reset ICL buffer between tasks: without this the example buffer carries
+            # over into the next task, causing input tokens to stay permanently at the
+            # max_examples ceiling (task 1+ start already saturated). Resetting here
+            # keeps each task's context window clean and token counts predictable.
+            system.reset()
+
             # Write partial result after each task so progress is visible mid-run
             if outpath:
                 _write_result(outpath, system_name, info, task_name,

@@ -32,6 +32,42 @@ experiments:
     parallel: false
     max_workers: 1
 
+  qwen3_vs_gpt54:
+    description: "qwen3-32b vs gpt-5.4 — stateless horse race"
+    tasks:
+      - sales_prediction
+    models:
+      - qwen3-32b
+      - gpt-5.4
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 2
+
+  gpt4o_vs_qwen36_icl:
+    description: "gpt-4o vs qwen3.6-27b — ICL mode horse race"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o
+      - qwen3.6-27b
+    systems:
+      - icl
+    parallel: true
+    max_workers: 2
+
+  lfm_vs_qwen3:
+    description: "LiquidAI-LFM2.5-1.2B-Instruct vs qwen3-32b — stateless horse race"
+    tasks:
+      - sales_prediction
+    models:
+      - LiquidAI-LFM2.5-1.2B-Instruct
+      - qwen3-32b
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 2
+
   horse_race_v2:
     description: "Full 6-model horse race — non-reasoning vs reasoning, stateless"
     tasks:
@@ -79,6 +115,31 @@ experiments:
     models:
       - gpt-4o
       - LiquidAI-LFM2.5-1.2B-Thinking
+    systems:
+      - icl
+    parallel: true
+    max_workers: 2
+
+  reasoning_icl_v2:
+    description: "gpt-5.4 vs qwen3.6-27b vs Mercury2 — ICL mode, think-strip + max_tokens=1500 fix"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-5.4
+      - qwen3.6-27b
+      - Inception-Mercury2
+    systems:
+      - icl
+    parallel: true
+    max_workers: 3
+
+  gpt54_vs_mercury2_icl:
+    description: "gpt-5.4 vs Inception-Mercury2 — ICL mode, post token-reduction fix (max_examples=5, per-task reset)"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-5.4
+      - Inception-Mercury2
     systems:
       - icl
     parallel: true

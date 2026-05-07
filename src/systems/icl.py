@@ -6,8 +6,11 @@ from src.utils.llm import complete
 class ICLSystem(BaseSystem):
     """In-context learning — carries a rolling example buffer in the prompt."""
 
-    def __init__(self, model: str, max_examples: int = 10, system_prompt: str = "",
+    def __init__(self, model: str, max_examples: int = 5, system_prompt: str = "",
                  llm_kwargs: dict | None = None):
+        # max_examples=5: sales_prediction observations are ~1200-1800 tokens each;
+        # 10 examples pushed input tokens to 14k-18k per call and hit context limits
+        # on smaller models (e.g. qwen3.6-27b, LFM). 5 keeps the buffer under ~9k tokens.
         self.model = model
         self.max_examples = max_examples
         self.system_prompt = system_prompt

@@ -1,4 +1,5 @@
 import random
+import re
 import time
 
 import litellm
@@ -7,6 +8,11 @@ from dotenv import load_dotenv
 from src.utils.logger import get_logger, log_llm_call
 
 load_dotenv()
+
+# Strip <think>...</think> blocks that reasoning models (qwen3, deepseek-r1, etc.)
+# embed in their content. Without this, ICL stores the full chain-of-thought in the
+# example buffer — 5 examples × ~3k thinking tokens = 15k tokens of useless prompt noise.
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 litellm.drop_params = True  # silently ignore params unsupported by a provider
 
@@ -84,6 +90,7 @@ def _call_once(model: str, messages: list[dict], **kwargs) -> str:
     msg = response.choices[0].message
     # Reasoning models (R1, o1) may return content=None; fall back to reasoning_content.
     text = msg.content or getattr(msg, "reasoning_content", None) or ""
+    text = _THINK_RE.sub("", text).strip()
     usage = dict(response.usage) if response.usage else {}
 
     try:

@@ -45,7 +45,7 @@ openai:
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 128000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 30
 
     o3-mini:                               # small
@@ -53,7 +53,7 @@ openai:
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 200000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 30
 
     o3:                                    # large
@@ -77,7 +77,7 @@ openai:
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 400000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 30
 
     gpt-5.5:                               # large
@@ -130,8 +130,8 @@ anthropic:
       context_window: 200000
       requires_key: ANTHROPIC_API_KEY
       params:
-        max_tokens: 4000
-        budget_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
+        budget_tokens: 1200            # thinking budget; max_tokens must exceed this
         timeout: 60
 
 # ─────────────────────────────────────────────────────────────
@@ -204,25 +204,33 @@ openrouter:
     qwen3-32b:                               # medium
       litellm: "openrouter/qwen/qwen3-32b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
-      context_window: 32000
+      context_window: 40000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
 
-    Inception-Mercury2:
+    qwen3.6-27b:                             # medium
+      litellm: "openrouter/qwen/qwen3.6-27b"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 262000
+      params:
+        max_tokens: 1500               # capped: task only needs a single integer answer
+        timeout: 60
+
+    Inception-Mercury2:                      # medium
       litellm: "openrouter/inception/mercury-2"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 128000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
 
-    LiquidAI-LFM2.5-1.2B-Thinking:
+    LiquidAI-LFM2.5-1.2B-Thinking:          # small
       litellm: "openrouter/liquid/lfm-2.5-1.2b-thinking:free"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 32000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 30
 
     deepseek-r1-distill-llama:             # medium (70B distill)
@@ -230,7 +238,7 @@ openrouter:
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 64000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
 
     deepseek-r1-distill-qwen:             # medium (32B distill)
@@ -238,7 +246,7 @@ openrouter:
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 32000
       params:
-        max_tokens: 4000
+        max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
 
 # ─────────────────────────────────────────────────────────────
