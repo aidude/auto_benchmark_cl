@@ -201,8 +201,8 @@ openrouter:
         max_tokens: 4000
         timeout: 120
 
-    qwq-32b:                               # medium
-      litellm: "openrouter/qwen/qwq-32b"
+    qwen3-32b:                               # medium
+      litellm: "openrouter/qwen/qwen3-32b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 32000
       params:

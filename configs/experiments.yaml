@@ -32,6 +32,22 @@ experiments:
     parallel: false
     max_workers: 1
 
+  horse_race_v2:
+    description: "Full 6-model horse race — non-reasoning vs reasoning, stateless"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o
+      - o3
+      - gpt-5.4
+      - Inception-Mercury2
+      - qwq-32b
+      - llama-3.3-70b
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 3
+
   gpt4o_vs_o3:
     description: "gpt-4o (non-reasoning) vs o3 (reasoning) — stateless horse race"
     tasks:
