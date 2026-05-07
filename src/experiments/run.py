@@ -24,7 +24,14 @@ from tqdm import tqdm
 from src.utils.logger import get_logger, RUN_ID
 from src.systems.stateless import StatelessSystem
 from src.systems.icl import ICLSystem
-from src.tasks import SalesPredictionTask
+from src.tasks import (
+    SalesPredictionTask,
+    ExploitablePokerTask,
+    DatabaseExplorationTask,
+    CohortStudiesTask,
+    BlindSpectrumMonitoringTask,
+    CodebaseAdaptationTask,
+)
 
 _log = get_logger(__name__)
 
@@ -112,7 +119,12 @@ SYSTEMS: dict[str, type] = {
 }
 
 TASKS: dict[str, type] = {
-    "sales_prediction": SalesPredictionTask,
+    "sales_prediction":          SalesPredictionTask,
+    "exploitable_poker":         ExploitablePokerTask,
+    "database_exploration":      DatabaseExplorationTask,
+    "cohort_studies":            CohortStudiesTask,
+    "blind_spectrum_monitoring": BlindSpectrumMonitoringTask,
+    "codebase_adaptation":       CodebaseAdaptationTask,
 }
 
 # Steers reasoning models away from verbose self-correction loops.
