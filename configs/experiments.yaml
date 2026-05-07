@@ -20,6 +20,42 @@
 
 experiments:
 
+  gpt4o_vs_dsv4pro:
+    description: "gpt-4o (non-reasoning) vs deepseek-v4-Pro (reasoning) — brevity steering test"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o
+      - deepseek-v4-Pro
+    systems:
+      - stateless
+    parallel: false
+    max_workers: 1
+
+  dsv3_vs_mercury2:
+    description: "deepseek-v3 (non-reasoning) vs Inception-Mercury2 (reasoning) — stateless horse race"
+    tasks:
+      - sales_prediction
+    models:
+      - deepseek-v3
+      - Inception-Mercury2
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 2
+
+  gpt4o_vs_lfm_icl:
+    description: "gpt-4o vs LiquidAI-LFM2.5-1.2B-Thinking — ICL only, verify within-task update fix"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o
+      - LiquidAI-LFM2.5-1.2B-Thinking
+    systems:
+      - icl
+    parallel: true
+    max_workers: 2
+
   test_one:
     description: "Single combo smoke test — verify batch runner end-to-end"
     tasks:
@@ -53,6 +89,19 @@ experiments:
     models:
       - gpt-4o-mini
       - deepseek-chat
+    systems:
+      - stateless
+      - icl
+    parallel: true
+    max_workers: 4
+
+  icl_vs_stateless_v2:
+    description: "gpt-4o vs Inception-Mercury2 — stateless and ICL systems"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-4o
+      - Inception-Mercury2
     systems:
       - stateless
       - icl

@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from tqdm import tqdm
+
 from src.utils.logger import get_logger, RUN_ID
 from src.experiments.run import (
     run, resolve_model, _check_key, SYSTEMS, TASKS, _PROJECT_ROOT,
@@ -84,15 +86,20 @@ def _run_combo(combo: Combo, outdir: Path) -> ComboResult:
     out = _outpath(outdir, combo)
 
     if out.exists():
-        _log.info("SKIP  %s / %s / %s (result exists)", combo.task, combo.model, combo.system)
-        return ComboResult(combo=combo, status="skipped", output=str(out))
+        # Only skip if the file is a complete (non-partial) result.
+        try:
+            if json.loads(out.read_text()).get("complete", True):
+                _log.info("SKIP  %s / %s / %s (result exists)", combo.task, combo.model, combo.system)
+                return ComboResult(combo=combo, status="skipped", output=str(out))
+        except (json.JSONDecodeError, KeyError):
+            pass  # corrupt / partial file → re-run
 
     t0 = time.time()
     try:
         info = resolve_model(combo.model)
         _check_key(info)
-        result = run(combo.system, info, combo.task)
-        out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+        # run() writes to outpath after every task (partial) and at completion (final)
+        result = run(combo.system, info, combo.task, outpath=out)
         elapsed = round(time.time() - t0, 1)
         _log.info(
             "OK    %s / %s / %s  overall=%.4f  %.1fs",
@@ -133,14 +140,26 @@ def run_experiment(name: str, exp_cfg: dict, dry_run: bool = False) -> dict:
     t0 = time.time()
     results: list[ComboResult] = []
 
+    combo_bar = tqdm(total=len(combos), desc=f"[{name}]", unit="combo", dynamic_ncols=True)
+
+    def _done(r: ComboResult) -> None:
+        results.append(r)
+        ok   = sum(1 for x in results if x.status == "ok")
+        fail = sum(1 for x in results if x.status == "failed")
+        skip = sum(1 for x in results if x.status == "skipped")
+        combo_bar.set_postfix(ok=ok, fail=fail, skip=skip)
+        combo_bar.update(1)
+
     if parallel and max_workers > 1:
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = {pool.submit(_run_combo, c, outdir): c for c in combos}
             for fut in as_completed(futures):
-                results.append(fut.result())
+                _done(fut.result())
     else:
         for combo in combos:
-            results.append(_run_combo(combo, outdir))
+            _done(_run_combo(combo, outdir))
+
+    combo_bar.close()
 
     elapsed  = round(time.time() - t0, 1)
     ok       = [r for r in results if r.status == "ok"]

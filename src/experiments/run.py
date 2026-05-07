@@ -19,6 +19,8 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
+from tqdm import tqdm
+
 from src.utils.logger import get_logger, RUN_ID
 from src.systems.stateless import StatelessSystem
 from src.systems.icl import ICLSystem
@@ -113,16 +115,43 @@ TASKS: dict[str, type] = {
     "sales_prediction": SalesPredictionTask,
 }
 
+# Steers reasoning models away from verbose self-correction loops.
+# Targets "Wait / Hmm / let me reconsider" patterns that balloon token counts.
+_REASONING_SYSTEM_PROMPT = (
+    "You are a precise forecasting assistant. "
+    "Think briefly, then give your final answer immediately. "
+    "Keep reasoning to 3 steps or fewer. "
+    "Do not use filler words like 'wait' or 'hmm', and do not self-correct. "
+    "Your response must be a single integer."
+)
+
 
 # ── Episode runner ────────────────────────────────────────────
 
 def _run_task(system, task, task_id: int) -> tuple[list[float], list[dict], str]:
-    """Run all episodes for one task. Parallel when system.parallel_safe."""
+    """Run all episodes for one task.
+
+    Parallel systems (parallel_safe=True): all act() calls fire concurrently,
+    then update() is called in order after all futures complete.
+
+    Serial systems (ICL, SAGE, …): act → score → update are interleaved per
+    episode so the in-context buffer is current for every subsequent call.
+    """
     episodes = list(task.iter_episodes(task_id))
+    regime = episodes[0].regime
+    scored: list[tuple[str, float]] = []
+
+    bar = tqdm(
+        total=len(episodes),
+        desc=f"    {regime:<15}",
+        unit="ep",
+        leave=False,
+        dynamic_ncols=True,
+    )
 
     if getattr(system, "parallel_safe", False):
         # Fire all LLM calls concurrently; collect in submission order.
-        scored: list[tuple[str, float]] = [None] * len(episodes)
+        indexed: list[tuple[str, float]] = [None] * len(episodes)
 
         def _call(idx: int, ep):
             action = system.act({"text": ep.text, "task_id": task_id})
@@ -133,45 +162,71 @@ def _run_task(system, task, task_id: int) -> tuple[list[float], list[dict], str]
             futures = {pool.submit(_call, i, ep): i for i, ep in enumerate(episodes)}
             for fut in as_completed(futures):
                 i, action, reward = fut.result()
-                scored[i] = (action, reward)
+                indexed[i] = (action, reward)
+                bar.update(1)
+
+        # update() in submission order after all parallel calls complete
+        for ep, (action, reward) in zip(episodes, indexed):
+            system.update({"text": ep.text, "task_id": task_id}, action, reward)
+        scored = indexed
     else:
-        scored = []
+        # Serial: interleave act → score → update so each episode sees the
+        # accumulated in-context buffer from all previous episodes.
         for ep in episodes:
-            action = system.act({"text": ep.text, "task_id": task_id})
+            obs = {"text": ep.text, "task_id": task_id}
+            action = system.act(obs)
             reward = task.score(action, ep.target)
+            system.update(obs, action, reward)
             scored.append((action, reward))
+            bar.update(1)
+
+    bar.close()
 
     scores, episode_log = [], []
     for ep, (action, reward) in zip(episodes, scored):
-        system.update({"text": ep.text, "task_id": task_id}, action, reward)
         scores.append(reward)
         episode_log.append({"target": ep.target, "response": action, "score": round(reward, 4)})
 
-    return scores, episode_log, episodes[-1].regime
+    return scores, episode_log, regime
 
 
 # ── Experiment entry point ────────────────────────────────────
 
-def run(system_name: str, info: ModelInfo, task_name: str) -> dict:
+def run(system_name: str, info: ModelInfo, task_name: str,
+        outpath: Path | None = None) -> dict:
     _log.info("START  system=%s  model=%s  type=%s  task=%s",
               system_name, info.litellm_id, info.model_type, task_name)
     task = TASKS[task_name]()
-    system = SYSTEMS[system_name](model=info.litellm_id, llm_kwargs=info.params)
+    system_prompt = _REASONING_SYSTEM_PROMPT if info.model_type == "reasoning" else ""
+    if system_prompt:
+        _log.info("  reasoning prompt active — brevity steering enabled")
+    system = SYSTEMS[system_name](model=info.litellm_id, system_prompt=system_prompt, llm_kwargs=info.params)
 
     per_task, t0 = [], time.time()
+    num_tasks = task.num_tasks
 
-    for task_id in range(task.num_tasks):
-        scores, episode_log, regime = _run_task(system, task, task_id)
-        mean = sum(scores) / len(scores)
-        _log.info("  Task %d (%s): mean=%.4f  n=%d", task_id, regime, mean, len(scores))
-        per_task.append({"task_id": task_id, "regime": regime,
-                         "mean_score": round(mean, 4), "episodes": episode_log})
+    with tqdm(total=num_tasks, desc=f"  {info.short_name}/{system_name}", unit="task",
+              dynamic_ncols=True) as task_bar:
+        for task_id in range(num_tasks):
+            scores, episode_log, regime = _run_task(system, task, task_id)
+            mean = sum(scores) / len(scores)
+            _log.info("  Task %d (%s): mean=%.4f  n=%d", task_id, regime, mean, len(scores))
+            per_task.append({"task_id": task_id, "regime": regime,
+                             "mean_score": round(mean, 4), "episodes": episode_log})
+
+            task_bar.set_postfix(regime=regime, mean=f"{mean:.3f}")
+            task_bar.update(1)
+
+            # Write partial result after each task so progress is visible mid-run
+            if outpath:
+                _write_result(outpath, system_name, info, task_name,
+                              per_task, t0, complete=False)
 
     overall = round(sum(t["mean_score"] for t in per_task) / len(per_task), 4)
     elapsed = round(time.time() - t0, 1)
     _log.info("DONE   overall=%.4f  elapsed=%.1fs", overall, elapsed)
 
-    return {
+    result = {
         "run_id":       RUN_ID,
         "date":         datetime.now().strftime("%Y-%m-%d"),
         "system":       system_name,
@@ -183,7 +238,31 @@ def run(system_name: str, info: ModelInfo, task_name: str) -> dict:
         "per_task":     per_task,
         "overall_mean": overall,
         "elapsed_s":    elapsed,
+        "complete":     True,
     }
+    if outpath:
+        outpath.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return result
+
+
+def _write_result(outpath: Path, system_name: str, info: ModelInfo,
+                  task_name: str, per_task: list, t0: float, complete: bool) -> None:
+    """Write partial or final result JSON to outpath."""
+    partial_mean = round(sum(t["mean_score"] for t in per_task) / len(per_task), 4)
+    outpath.write_text(json.dumps({
+        "run_id":       RUN_ID,
+        "date":         datetime.now().strftime("%Y-%m-%d"),
+        "system":       system_name,
+        "model":        info.litellm_id,
+        "model_short":  info.short_name,
+        "provider":     info.provider,
+        "model_type":   info.model_type,
+        "task":         task_name,
+        "per_task":     per_task,
+        "overall_mean": partial_mean,
+        "elapsed_s":    round(time.time() - t0, 1),
+        "complete":     complete,
+    }, indent=2), encoding="utf-8")
 
 
 def _default_output(task: str, model_short: str, system: str) -> Path:
@@ -204,11 +283,9 @@ def main() -> None:
     info = resolve_model(args.model)
     _check_key(info)
 
-    result = run(args.system, info, args.task)
-
     out = Path(args.output) if args.output else _default_output(args.task, args.model, args.system)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    run(args.system, info, args.task, outpath=out)
     _log.info("Saved → %s", out)
 
 

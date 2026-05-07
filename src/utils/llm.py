@@ -1,6 +1,9 @@
+import random
 import time
+
 import litellm
 from dotenv import load_dotenv
+
 from src.utils.logger import get_logger, log_llm_call
 
 load_dotenv()
@@ -8,6 +11,20 @@ load_dotenv()
 litellm.drop_params = True  # silently ignore params unsupported by a provider
 
 _log = get_logger(__name__)
+
+_DEFAULT_TIMEOUT = 60     # per-call timeout (s); overridden via model params in models.yaml
+_MAX_RETRIES     = 3      # attempts after the first failure
+_RETRY_BASE_S    = 2.0    # initial backoff delay; doubles each retry + jitter
+
+# Transient errors worth retrying — anything else is a hard failure (auth, bad request, etc.)
+_RETRYABLE_EXCEPTIONS = (
+    litellm.exceptions.RateLimitError,
+    litellm.exceptions.Timeout,
+    litellm.exceptions.ServiceUnavailableError,
+    litellm.exceptions.APIConnectionError,
+    litellm.exceptions.APIError,           # catches 5xx upstream errors
+    litellm.exceptions.InternalServerError,
+)
 
 _PROVIDER_MAP = {
     "openrouter/": "openrouter",
@@ -29,7 +46,35 @@ def _provider(model: str) -> str:
 
 
 def complete(model: str, messages: list[dict], **kwargs) -> str:
-    """Call any model via LiteLLM. Returns assistant text."""
+    """Call any model via LiteLLM with automatic retry on transient failures.
+
+    Timeout defaults to _DEFAULT_TIMEOUT but can be overridden per-model via
+    params.timeout in models.yaml.
+    """
+    kwargs.setdefault("timeout", _DEFAULT_TIMEOUT)
+
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            return _call_once(model, messages, **kwargs)
+        except _RETRYABLE_EXCEPTIONS as exc:
+            last_exc = exc
+            if attempt == _MAX_RETRIES:
+                break
+            delay = _RETRY_BASE_S * (2 ** attempt) + random.uniform(0, 1)
+            _log.warning(
+                "Transient error on attempt %d/%d for %s (%s: %s) — retrying in %.1fs",
+                attempt + 1, _MAX_RETRIES + 1, model,
+                type(exc).__name__, str(exc)[:120], delay,
+            )
+            time.sleep(delay)
+
+    _log.error("All %d attempts failed for %s: %s", _MAX_RETRIES + 1, model, last_exc)
+    raise last_exc
+
+
+def _call_once(model: str, messages: list[dict], **kwargs) -> str:
+    """Single (non-retried) LiteLLM call with logging."""
     _log.debug("→ %s  messages=%d", model, len(messages))
     t0 = time.monotonic()
 

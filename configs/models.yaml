@@ -32,54 +32,61 @@ openai:
       context_window: 128000
 
   reasoning:
-    o1:
+    o1:                                    # large
       litellm: "o1"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 200000
       params:
         max_tokens: 4000
+        timeout: 120
 
-    o1-mini:
+    o1-mini:                               # small
       litellm: "o1-mini"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 128000
       params:
         max_tokens: 4000
+        timeout: 30
 
-    o3-mini:
+    o3-mini:                               # small
       litellm: "o3-mini"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 200000
       params:
         max_tokens: 4000
+        timeout: 30
 
-    o3:
+    o3:                                    # large
       litellm: "o3"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 200000
       params:
         max_tokens: 4000
-    
-    gpt-5.4:
+        timeout: 120
+
+    gpt-5.4:                               # large
       litellm: "gpt-5.4-2026-03-05"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 1000000
       params:
         max_tokens: 4000
+        timeout: 120
 
-    gpt-5.4-mini:
+    gpt-5.4-mini:                          # small
       litellm: "gpt-5.4-mini-2026-03-17"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 400000
       params:
         max_tokens: 4000
+        timeout: 30
 
-    gpt-5.5:
+    gpt-5.5:                               # large
       litellm: "gpt-5.5-2026-04-23"
       endpoint: "https://api.openai.com/v1/chat/completions"
       context_window: 1000000
       params:
         max_tokens: 4000
+        timeout: 120
     
 
 # ─────────────────────────────────────────────────────────────
@@ -107,7 +114,7 @@ anthropic:
   reasoning:
     # Extended thinking — budget_tokens is passed as the
     # `thinking` dict by llm.py when it detects the key.
-    claude-opus-4-7-think:
+    claude-opus-4-7-think:                 # large
       litellm: "claude-opus-4-7"
       endpoint: "https://api.anthropic.com/v1/messages"
       context_window: 200000
@@ -115,8 +122,9 @@ anthropic:
       params:
         max_tokens: 4000
         budget_tokens: 4000   # converted to thinking={} in llm.py
+        timeout: 120
 
-    claude-sonnet-4-6-think:
+    claude-sonnet-4-6-think:               # medium
       litellm: "claude-sonnet-4-6"
       endpoint: "https://api.anthropic.com/v1/messages"
       context_window: 200000
@@ -124,6 +132,7 @@ anthropic:
       params:
         max_tokens: 4000
         budget_tokens: 4000
+        timeout: 60
 
 # ─────────────────────────────────────────────────────────────
 openrouter:
@@ -167,14 +176,22 @@ openrouter:
       litellm: "openrouter/microsoft/phi-4"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 16000
+    
+    LiquidAI-LFM2.5-1.2B-Instruct:
+      litellm: "openrouter/liquid/lfm-2.5-1.2b-instruct:free"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 32000
+      params:
+        timeout: 30
 
   reasoning:
-    deepseek-r1:
+    deepseek-r1:                           # large
       litellm: "openrouter/deepseek/deepseek-r1"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 64000
       params:
         max_tokens: 4000
+        timeout: 120
 
     deepseek-v4-Pro:
       litellm: "openrouter/deepseek/deepseek-v4-pro"
@@ -182,27 +199,47 @@ openrouter:
       context_window: 1000000
       params:
         max_tokens: 4000
+        timeout: 120
 
-    qwq-32b:
+    qwq-32b:                               # medium
       litellm: "openrouter/qwen/qwq-32b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 32000
       params:
         max_tokens: 4000
+        timeout: 60
 
-    deepseek-r1-distill-llama:
+    Inception-Mercury2:
+      litellm: "openrouter/inception/mercury-2"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 128000
+      params:
+        max_tokens: 4000
+        timeout: 60
+
+    LiquidAI-LFM2.5-1.2B-Thinking:
+      litellm: "openrouter/liquid/lfm-2.5-1.2b-thinking:free"
+      endpoint: "https://openrouter.ai/api/v1/chat/completions"
+      context_window: 32000
+      params:
+        max_tokens: 4000
+        timeout: 30
+
+    deepseek-r1-distill-llama:             # medium (70B distill)
       litellm: "openrouter/deepseek/deepseek-r1-distill-llama-70b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 64000
       params:
         max_tokens: 4000
+        timeout: 60
 
-    deepseek-r1-distill-qwen:
+    deepseek-r1-distill-qwen:             # medium (32B distill)
       litellm: "openrouter/deepseek/deepseek-r1-distill-qwen-32b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 32000
       params:
         max_tokens: 4000
+        timeout: 60
 
 # ─────────────────────────────────────────────────────────────
 # Default horse-race shortlist (used by run_horse_race.sh)
