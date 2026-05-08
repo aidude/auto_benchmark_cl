@@ -145,6 +145,31 @@ experiments:
     parallel: true
     max_workers: 2
 
+  sales_icl_v3:
+    description: "gpt-5.4 vs kimi-k2.6 vs minimax-m2.7 — sales_prediction ICL"
+    tasks:
+      - sales_prediction
+    models:
+      - gpt-5.4
+      - kimi-k2.6
+      - minimax-m2.7
+    systems:
+      - icl
+    parallel: true
+    max_workers: 3
+
+  sarvam105b_vs_gpt4o_icl:
+    description: "sarvam-105b vs gpt-4o — sales_prediction ICL mode"
+    tasks:
+      - sales_prediction
+    models:
+      - sarvam-105b
+      - gpt-4o
+    systems:
+      - icl
+    parallel: true
+    max_workers: 2
+
   poker_sarvam_icl:
     description: "Exploitable poker ICL — gpt-5.4 vs sarvam-30b vs llama-3.3-70b"
     tasks:
