@@ -9,10 +9,30 @@ from src.utils.logger import get_logger, log_llm_call
 
 load_dotenv()
 
-# Strip <think>...</think> blocks that reasoning models (qwen3, deepseek-r1, etc.)
-# embed in their content. Without this, ICL stores the full chain-of-thought in the
-# example buffer — 5 examples × ~3k thinking tokens = 15k tokens of useless prompt noise.
-_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+# Reasoning models (qwen3, deepseek-r1, sarvam, etc.) wrap chain-of-thought in
+# <think>...</think>. Without stripping, ICL stores the full trace in the example
+# buffer — 5 examples x ~3k thinking tokens = 15k tokens of noise per call.
+#
+# Safe strip strategy:
+#   1. Remove <think>...</think>; keep what remains.
+#   2. If nothing remains (model buried the answer inside the block), grab
+#      everything after </think> — some models emit the final answer there.
+#   3. Last resort: return original so callers never receive an empty string.
+_THINK_RE    = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_AFTER_THINK = re.compile(r"</think>(.*)",       re.DOTALL | re.IGNORECASE)
+
+
+def _strip_thinking(text: str) -> str:
+    stripped = _THINK_RE.sub("", text).strip()
+    if stripped:
+        return stripped
+    m = _AFTER_THINK.search(text)
+    if m:
+        after = m.group(1).strip()
+        if after:
+            return after
+    _log.warning("think-strip produced empty response; returning raw text (len=%d)", len(text))
+    return text.strip()
 
 litellm.drop_params = True  # silently ignore params unsupported by a provider
 
@@ -36,11 +56,13 @@ _PROVIDER_MAP = {
     "openrouter/": "openrouter",
     "claude":      "anthropic",
     "anthropic":   "anthropic",
+    "sarvam/":     "sarvam",
 }
 _ENDPOINT_MAP = {
     "openrouter": "https://openrouter.ai/api/v1/chat/completions",
     "anthropic":  "https://api.anthropic.com/v1/messages",
     "openai":     "https://api.openai.com/v1/chat/completions",
+    "sarvam":     "https://api.sarvam.ai/v1/chat/completions",
 }
 
 
@@ -90,7 +112,7 @@ def _call_once(model: str, messages: list[dict], **kwargs) -> str:
     msg = response.choices[0].message
     # Reasoning models (R1, o1) may return content=None; fall back to reasoning_content.
     text = msg.content or getattr(msg, "reasoning_content", None) or ""
-    text = _THINK_RE.sub("", text).strip()
+    text = _strip_thinking(text)
     usage = dict(response.usage) if response.usage else {}
 
     try:

@@ -145,6 +145,49 @@ experiments:
     parallel: true
     max_workers: 2
 
+  poker_sarvam_icl:
+    description: "Exploitable poker ICL — gpt-5.4 vs sarvam-30b vs llama-3.3-70b"
+    tasks:
+      - exploitable_poker
+    models:
+      - gpt-5.4
+      - sarvam-30b
+      - llama-3.3-70b
+    systems:
+      - icl
+    parallel: true
+    max_workers: 3
+
+  poker_race_v1_icl:
+    description: "Exploitable poker — 5-model race, ICL mode"
+    tasks:
+      - exploitable_poker
+    models:
+      - gpt-4o
+      - gpt-5.4
+      - Inception-Mercury2
+      - llama-3.3-70b
+      - deepseek-v3
+    systems:
+      - icl
+    parallel: true
+    max_workers: 4
+
+  poker_race_v1:
+    description: "Exploitable poker — 5-model race, stateless baseline"
+    tasks:
+      - exploitable_poker
+    models:
+      - gpt-4o
+      - gpt-5.4
+      - Inception-Mercury2
+      - llama-3.3-70b
+      - deepseek-v3
+    systems:
+      - stateless
+    parallel: true
+    max_workers: 4
+
   test_one:
     description: "Single combo smoke test — verify batch runner end-to-end"
     tasks:
