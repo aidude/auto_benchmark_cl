@@ -22,10 +22,12 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.utils.logger import get_logger, RUN_ID
+from src.utils.metrics import compute_cl_metrics
 from src.systems.stateless import StatelessSystem
 from src.systems.icl import ICLSystem
 from src.tasks import (
     SalesPredictionTask,
+    SalesPredictionMiniTask,
     ExploitablePokerTask,
     DatabaseExplorationTask,
     CohortStudiesTask,
@@ -120,6 +122,7 @@ SYSTEMS: dict[str, type] = {
 
 TASKS: dict[str, type] = {
     "sales_prediction":          SalesPredictionTask,
+    "sales_prediction_mini":     SalesPredictionMiniTask,
     "exploitable_poker":         ExploitablePokerTask,
     "database_exploration":      DatabaseExplorationTask,
     "cohort_studies":            CohortStudiesTask,
@@ -212,19 +215,133 @@ def run(system_name: str, info: ModelInfo, task_name: str,
     system_prompt = _REASONING_SYSTEM_PROMPT if info.model_type == "reasoning" else ""
     if system_prompt:
         _log.info("  reasoning prompt active — brevity steering enabled")
+
+    # GUARD 1: skip — model is marked unusable in models.yaml (e.g. API timeouts every call)
+    if info.params.get("skip", False):
+        _log.warning("[SKIP] %s — marked skip:true in models.yaml", info.short_name)
+        skip_result = {
+            "run_id": RUN_ID,
+            "model":  info.short_name,
+            "status": "skipped",
+            "reason": "skip:true in models.yaml",
+        }
+        if outpath:
+            outpath.write_text(json.dumps(skip_result, indent=2), encoding="utf-8")
+        return skip_result
+
+    # GUARD 2: icl_compatible — reasoning models with long chains make the ICL buffer
+    # unreliable (answers buried at end of 4k-token chains) and very slow (serial calls).
+    # Auto-switch to stateless so the run completes in reasonable time.
+    if system_name == "icl" and not info.params.get("icl_compatible", True):
+        _log.warning(
+            "[ICL→STATELESS] %s has icl_compatible=false. "
+            "Switching to stateless automatically. "
+            "Reason: reasoning chains make ICL buffer unreliable and very slow.",
+            info.short_name,
+        )
+        system_name = "stateless"
+
+    # GUARD 3: format_override — prepend a strict output instruction for models (e.g. sarvam-30b)
+    # that ignore the task prompt and produce verbose prose, scoring ~0 on structured tasks.
+    format_override = info.params.get("format_override", "")
+    if format_override:
+        system_prompt = format_override + ("\n\n" + system_prompt if system_prompt else "")
+
+    # GUARD 4: parallel execution flag.
+    # Only enable for stateless + parallel_safe models (open reasoning models after ICL→stateless
+    # switch). ICL must always run serially — ordered update() calls are required.
+    use_parallel = (
+        info.params.get("parallel_safe", False)
+        and system_name == "stateless"
+    )
+    if use_parallel:
+        _log.info("  parallel execution enabled for %s", info.short_name)
+
+    # FLOOR LOGIC: load stateless BWT baseline from previous stateless run on this task.
+    # The stateless floor represents task-inherent regime discontinuity — the minimum BWT
+    # achievable by any system with zero memory. It is the reference point for bwt_gain.
+    stateless_bwt: float | None = None
+    stateless_scores: list[float] | None = None
+    if system_name != "stateless" and outpath is not None:
+        floor_path = outpath.parent / "stateless_floor.json"
+        if floor_path.exists():
+            try:
+                floor = json.loads(floor_path.read_text())
+                stateless_bwt    = floor.get("stateless_bwt")
+                stateless_scores = floor.get("stateless_diagonal")
+                _log.info("Task floor loaded from %s — stateless BWT: %s", floor_path, stateless_bwt)
+            except Exception as exc:
+                _log.warning("Could not load stateless_floor.json: %s", exc)
+        else:
+            _log.warning(
+                "No stateless_floor.json found at %s. "
+                "Run stateless first to enable bwt_gain_over_floor. "
+                "BWT will still be computed.",
+                floor_path,
+            )
+
     system = SYSTEMS[system_name](model=info.litellm_id, system_prompt=system_prompt, llm_kwargs=info.params)
 
     per_task, t0 = [], time.time()
     num_tasks = task.num_tasks
+    perf_matrix: list[list[float | None]] = [[None] * num_tasks for _ in range(num_tasks)]
 
     with tqdm(total=num_tasks, desc=f"  {info.short_name}/{system_name}", unit="task",
               dynamic_ncols=True) as task_bar:
         for task_id in range(num_tasks):
-            scores, episode_log, regime = _run_task(system, task, task_id)
+            if use_parallel:
+                # ── PARALLEL PATH: open reasoning models (kimi, minimax, qwen3) ──
+                # All 30 episodes fire concurrently. No update() — stateless has no state.
+                # Wall time ≈ ONE episode latency instead of 30×.
+                _eps = list(task.iter_episodes(task_id))
+                regime = _eps[0].regime
+
+                def _act_score(ep, _tid=task_id):
+                    _action = system.act({"text": ep.text, "task_id": _tid})
+                    _reward = task.score(_action, ep.target)
+                    return ep, _action, _reward
+
+                _out: list = [None] * len(_eps)
+                with ThreadPoolExecutor(max_workers=min(len(_eps), info.params.get("max_concurrent", _MAX_WORKERS))) as _ex:
+                    _futs = {_ex.submit(_act_score, ep): i for i, ep in enumerate(_eps)}
+                    for _fut in as_completed(_futs):
+                        _idx = _futs[_fut]
+                        try:
+                            _out[_idx] = _fut.result()
+                        except Exception as _exc:
+                            _log.error("  Episode %d failed: %s", _idx, _exc)
+                            _out[_idx] = (_eps[_idx], "", 0.0)
+
+                scores      = [r[2] for r in _out]
+                episode_log = [
+                    {"target": r[0].target, "response": r[1], "score": round(r[2], 4)}
+                    for r in _out
+                ]
+            else:
+                # ── SERIAL PATH: ICL and non-parallel stateless models ──
+                scores, episode_log, regime = _run_task(system, task, task_id)
+
             mean = sum(scores) / len(scores)
             _log.info("  Task %d (%s): mean=%.4f  n=%d", task_id, regime, mean, len(scores))
             per_task.append({"task_id": task_id, "regime": regime,
                              "mean_score": round(mean, 4), "episodes": episode_log})
+            perf_matrix[task_id][task_id] = round(mean, 4)
+
+            # Re-evaluate all prior regimes without touching system state.
+            # Runs before system.reset() so ICL buffer still reflects post-training state —
+            # this is the correct CL semantics: how well does the system remember regime i
+            # after having been trained through regime task_id?
+            if hasattr(task, "evaluate_regime"):
+                for prior_id in range(task_id):
+                    prior_score = task.evaluate_regime(prior_id, system)
+                    perf_matrix[prior_id][task_id] = prior_score
+                    _log.info(
+                        "  Re-eval regime %d after regime %d: %.4f  "
+                        "(was %.4f,  delta=%+.4f)",
+                        prior_id, task_id, prior_score,
+                        perf_matrix[prior_id][prior_id],
+                        prior_score - perf_matrix[prior_id][prior_id],
+                    )
 
             task_bar.set_postfix(regime=regime, mean=f"{mean:.3f}")
             task_bar.update(1)
@@ -242,7 +359,32 @@ def run(system_name: str, info: ModelInfo, task_name: str,
 
     overall = round(sum(t["mean_score"] for t in per_task) / len(per_task), 4)
     elapsed = round(time.time() - t0, 1)
+    cl_metrics = compute_cl_metrics(
+        perf_matrix,
+        stateless_scores=stateless_scores,
+        stateless_bwt=stateless_bwt,
+    )
     _log.info("DONE   overall=%.4f  elapsed=%.1fs", overall, elapsed)
+    _log.info(
+        "  CL: BWT=%s (%s)  gain_over_floor=%s (%s)  max_forgetting=%s",
+        cl_metrics["bwt"], cl_metrics["bwt_interpretation"],
+        cl_metrics["bwt_gain_over_floor"], cl_metrics["bwt_vs_floor"],
+        cl_metrics["max_forgetting"],
+    )
+
+    # Save stateless floor so subsequent ICL runs can compute bwt_gain_over_floor.
+    # Written to the same directory as the output file so model/task pairs each
+    # get their own floor — different models have different task-difficulty floors.
+    if system_name == "stateless" and outpath is not None:
+        floor_path = outpath.parent / "stateless_floor.json"
+        floor_data = {
+            "model":              info.short_name,
+            "task":               task_name,
+            "stateless_bwt":      cl_metrics["bwt"],
+            "stateless_diagonal": [perf_matrix[i][i] for i in range(num_tasks)],
+        }
+        floor_path.write_text(json.dumps(floor_data, indent=2), encoding="utf-8")
+        _log.info("Task floor saved → %s", floor_path)
 
     result = {
         "run_id":       RUN_ID,
@@ -257,6 +399,9 @@ def run(system_name: str, info: ModelInfo, task_name: str,
         "overall_mean": overall,
         "elapsed_s":    elapsed,
         "complete":     True,
+        "parallel":     use_parallel,
+        "perf_matrix":  perf_matrix,
+        "cl_metrics":   cl_metrics,
     }
     if outpath:
         outpath.write_text(json.dumps(result, indent=2), encoding="utf-8")

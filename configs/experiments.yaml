@@ -145,6 +145,18 @@ experiments:
     parallel: true
     max_workers: 2
 
+  kimi_minimax_token_test:
+    description: "kimi-k2.6 vs minimax-m2.7 — mini sales ICL smoke test (5 eps/regime, verify token fix)"
+    tasks:
+      - sales_prediction_mini
+    models:
+      - kimi-k2.6
+      - minimax-m2.7
+    systems:
+      - icl
+    parallel: true
+    max_workers: 2
+
   sales_icl_v3:
     description: "gpt-5.4 vs kimi-k2.6 vs minimax-m2.7 — sales_prediction ICL"
     tasks:

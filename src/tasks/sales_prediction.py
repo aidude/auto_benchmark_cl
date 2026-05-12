@@ -97,6 +97,20 @@ class SalesPredictionTask:
     def iter_episodes(self, task_id: int) -> Iterator[Episode]:
         yield from self._regimes[task_id]
 
+    def evaluate_regime(self, regime_id: int, system) -> float:
+        """Score system on the last 10 episodes of regime_id without modifying system state.
+
+        Last 10 of 30 episodes (33%) serve as a proxy held-out set. Using 10 instead of
+        3 reduces stochastic variance in the re-evaluation scores used for BWT computation.
+        Calls system.act() only — never system.update().
+        """
+        eval_episodes = self._regimes[regime_id][-10:]
+        scores = []
+        for ep in eval_episodes:
+            action = system.act({"text": ep.text, "task_id": regime_id})
+            scores.append(self.score(action, ep.target))
+        return round(sum(scores) / len(scores), 4) if scores else 0.0
+
     @staticmethod
     def score(response: str, target: float) -> float:
         """Reward in [0, 1]. 1 = perfect, 0 = ≥100% relative error or unparseable."""

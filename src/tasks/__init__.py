@@ -1,4 +1,5 @@
 from src.tasks.sales_prediction        import SalesPredictionTask
+from src.tasks.sales_prediction_mini   import SalesPredictionMiniTask
 from src.tasks.exploitable_poker       import ExploitablePokerTask
 from src.tasks.database_exploration    import DatabaseExplorationTask
 from src.tasks.cohort_studies          import CohortStudiesTask

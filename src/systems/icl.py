@@ -27,8 +27,16 @@ class ICLSystem(BaseSystem):
         messages.append({"role": "user", "content": observation["text"]})
         return complete(self.model, messages, **self.llm_kwargs)
 
+    # Store only the TAIL of the response, not the head. Step-by-step reasoning
+    # models (kimi, minimax, qwen3, etc.) emit their final answer at the end of
+    # a long chain-of-thought. Storing the first N chars captures "Let me think
+    # step by step..." instead of the answer; storing the last N chars captures
+    # the actual prediction that future episodes should learn from.
+    _MAX_ACTION_CHARS = 200
+
     def update(self, observation: dict, action: Any, reward: float) -> None:
-        self._examples.append({"observation": observation["text"], "action": str(action)})
+        stored_action = str(action)[-self._MAX_ACTION_CHARS:]
+        self._examples.append({"observation": observation["text"], "action": stored_action})
         if len(self._examples) > self.max_examples:
             self._examples.pop(0)
 

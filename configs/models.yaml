@@ -190,8 +190,9 @@ openrouter:
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 64000
       params:
-        max_tokens: 4000
-        timeout: 120
+        max_tokens: 16000
+        timeout: 300
+        max_concurrent: 5
 
     deepseek-v4-Pro:
       litellm: "openrouter/deepseek/deepseek-v4-pro"
@@ -199,39 +200,49 @@ openrouter:
       context_window: 1000000
       params:
         max_tokens: 4000
-        timeout: 120
+        timeout: 300
     
-    kimi-k2.6:
+    kimi-k2.6:                               # large — step-by-step reasoner; ICL-incompatible
       litellm: "openrouter/moonshotai/kimi-k2.6"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 262000
       params:
-        max_tokens: 4000
-        timeout: 120
-    
-    minimax-m2.7:
+        max_tokens: 16000
+        timeout: 300
+        max_concurrent: 3
+        icl_compatible: false
+        parallel_safe: true
+
+    minimax-m2.7:                            # large — step-by-step reasoner; ICL-incompatible
       litellm: "openrouter/minimax/minimax-m2.7"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 196000
       params:
-        max_tokens: 4000
-        timeout: 120
+        max_tokens: 16000
+        timeout: 300
+        max_concurrent: 3
+        icl_compatible: false
+        parallel_safe: true
 
-    qwen3-32b:                               # medium
+    qwen3-32b:                               # medium — ICL-incompatible (pollutes buffer)
       litellm: "openrouter/qwen/qwen3-32b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 40000
       params:
         max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
+        icl_compatible: false
+        parallel_safe: true
 
-    qwen3.6-27b:                             # medium
+    qwen3.6-27b:                             # medium — ICL-incompatible (token explosion)
       litellm: "openrouter/qwen/qwen3.6-27b"
       endpoint: "https://openrouter.ai/api/v1/chat/completions"
       context_window: 262000
       params:
         max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
+        icl_compatible: false
+        parallel_safe: true
 
     Inception-Mercury2:                      # medium
       litellm: "openrouter/inception/mercury-2"
@@ -273,7 +284,7 @@ sarvam:
   # They support reasoning and non-reasoning modes; reasoning is the default.
   # Chain-of-thought output is stripped by llm.py's _THINK_RE like other reasoning models.
   reasoning:
-    sarvam-105b:                             # large
+    sarvam-105b:                             # large — skip: API hangs 6+ min, timeout not enforced
       litellm: "sarvam/sarvam-105b"
       endpoint: "https://api.sarvam.ai/v1/chat/completions"
       context_window: 128000
@@ -281,8 +292,11 @@ sarvam:
       params:
         max_tokens: 4000
         timeout: 120
+        skip: true
+        icl_compatible: false
+        parallel_safe: false
 
-    sarvam-30b:                              # medium
+    sarvam-30b:                              # medium — prose responses; needs format_override
       litellm: "sarvam/sarvam-30b"
       endpoint: "https://api.sarvam.ai/v1/chat/completions"
       context_window: 32000
@@ -290,6 +304,9 @@ sarvam:
       params:
         max_tokens: 1500               # capped: task only needs a single integer answer
         timeout: 60
+        icl_compatible: false
+        parallel_safe: false
+        format_override: "Reply with ONLY a single integer or decimal number. No words. No explanation. No units. Just the number."
 
 # ─────────────────────────────────────────────────────────────
 # Default horse-race shortlist (used by run_horse_race.sh)
